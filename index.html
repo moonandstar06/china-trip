@@ -270,6 +270,21 @@ details ol,details ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-heig
 .exi .amt{font-family:"Baloo 2";font-weight:800;font-size:15px;white-space:nowrap}
 .exi .del{border:0;background:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 2px}
 .ex-empty{text-align:center;color:var(--ink-soft);font-size:13px;padding:14px 0}
+.ex-paidsum{display:flex;gap:8px;margin-top:10px}
+.paid-chip{flex:1;text-align:center;font-family:"Baloo 2";font-weight:800;font-size:13px;border-radius:10px;padding:7px 0;border:1px solid}
+.paid-chip.paid{background:#d8efe3;color:#1f5e42;border-color:#a9dcc4}
+.paid-chip.unpaid{background:#fdecec;color:var(--red-deep);border-color:#f3c4c9}
+.paid-toggle{display:flex;gap:6px}
+.pt{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:9px 0;font-family:"Baloo 2";font-weight:800;font-size:13px;cursor:pointer;color:var(--ink-soft)}
+.pt.on{background:var(--jade);color:#fff;border-color:var(--jade)}
+.paid-pill{display:inline-block;margin-top:5px;border:1.5px solid;border-radius:999px;padding:2px 10px;font-weight:800;font-size:11px;cursor:pointer}
+.paid-pill.paid{color:#1f5e42;border-color:#a9dcc4;background:#eafaf2}
+.paid-pill.unpaid{color:#b5642a;border-color:#f0d2a8;background:#fff6e6}
+.settle-row{cursor:pointer;justify-content:space-between}
+.settle-row .s-tag{font-size:11px;font-weight:800;color:#b5642a;white-space:nowrap;flex:0 0 auto}
+.settle-row.done{background:#eef4ef;border-color:#cfe3d6;opacity:.72}
+.settle-row.done .s-body{text-decoration:line-through;text-decoration-color:#b9c9bd}
+.settle-row.done .s-tag{color:#1f5e42}
 .sos{display:flex;gap:10px;flex-wrap:wrap}
 .sos a{flex:1;min-width:100px;text-decoration:none;background:#fff;border:2px solid var(--red);border-radius:14px;
   padding:10px;text-align:center;color:var(--red-deep)}
@@ -443,6 +458,7 @@ details ol,details ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-heig
           <div><div class="ex-k">Total logged</div><div class="ex-total" id="ex-total">₱0</div></div>
           <div class="rate-box">CN¥ 1 = ₱<input id="ex-rate" class="rate-in" inputmode="decimal" value="8.60" /></div>
         </div>
+        <div id="ex-paidsum" class="ex-paidsum"></div>
         <div id="ex-balances" class="ex-balances"></div>
         <div id="ex-settle" class="ex-settle"></div>
         <div class="share-row" style="margin-top:12px">
@@ -465,6 +481,11 @@ details ol,details ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-heig
         <div class="seg" id="ex-payer"></div>
         <div class="ex-lbl">Split between</div>
         <div class="split-row" id="ex-split"></div>
+        <div class="ex-lbl">Status</div>
+        <div class="paid-toggle" id="ex-paidset">
+          <button class="pt on" data-p="0">⏳ Not yet paid</button>
+          <button class="pt" data-p="1">✅ Already paid</button>
+        </div>
         <button class="btn primary" id="ex-add" style="margin-top:12px">Add expense</button>
       </div>
 
@@ -859,13 +880,14 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
 /* ---------- expense tracker + split ---------- */
 (function expenses(){
   const PEOPLE=PANDA_NAMES;
-  const RKEY="asianpandas.v1.rate", EKEY="asianpandas.v1.expenses";
-  let rate=8.6, list=[];
+  const RKEY="asianpandas.v1.rate", EKEY="asianpandas.v1.expenses", SKEY="asianpandas.v1.settled";
+  let rate=8.6, list=[], settled={};
   try{const r=parseFloat(localStorage.getItem(RKEY));if(r>0)rate=r;}catch(e){}
   try{list=JSON.parse(localStorage.getItem(EKEY))||[];}catch(e){list=[];}
-  const save=()=>{try{localStorage.setItem(EKEY,JSON.stringify(list));localStorage.setItem(RKEY,String(rate));}catch(e){}};
+  try{settled=JSON.parse(localStorage.getItem(SKEY))||{};}catch(e){settled={};}
+  const save=()=>{try{localStorage.setItem(EKEY,JSON.stringify(list));localStorage.setItem(RKEY,String(rate));localStorage.setItem(SKEY,JSON.stringify(settled));}catch(e){}};
   const $=id=>document.getElementById(id);
-  let cur="CNY", payer=0, split=[true,true,true];
+  let cur="CNY", payer=0, split=[true,true,true], paidNew=false;
   $("ex-rate").value=rate;
 
   $("ex-payer").innerHTML=PEOPLE.map((n,i)=>`<button data-i="${i}" class="${i===0?'active':''}">${n}</button>`).join("");
@@ -877,6 +899,8 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
     b.querySelector(".tick").textContent=split[i]?"✓ in":"out";}));
   $("ex-cur").querySelectorAll(".cur").forEach(b=>b.addEventListener("click",()=>{
     cur=b.dataset.c;$("ex-cur").querySelectorAll(".cur").forEach(x=>x.classList.toggle("active",x===b));}));
+  $("ex-paidset").querySelectorAll(".pt").forEach(b=>b.addEventListener("click",()=>{
+    paidNew=b.dataset.p==="1";$("ex-paidset").querySelectorAll(".pt").forEach(x=>x.classList.toggle("on",x===b));}));
   $("ex-rate").addEventListener("change",()=>{const v=parseFloat($("ex-rate").value);if(v>0){rate=v;save();render();}});
 
   $("ex-add").addEventListener("click",()=>{
@@ -884,16 +908,19 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
     if(!desc){alert("Add a short description");return;}
     if(!(amt>0)){alert("Enter an amount");return;}
     if(!split.some(Boolean)){alert("Pick at least one person to split between");return;}
-    list.unshift({id:Date.now(),desc,orig:amt,cur,payer,split:[...split]});
-    save();$("ex-desc").value="";$("ex-amt").value="";render();
+    list.unshift({id:Date.now(),desc,orig:amt,cur,payer,split:[...split],paid:paidNew});
+    save();$("ex-desc").value="";$("ex-amt").value="";
+    paidNew=false;$("ex-paidset").querySelectorAll(".pt").forEach((x,i)=>x.classList.toggle("on",i===0));
+    render();
   });
   $("ex-clear").addEventListener("click",()=>{
     if(!list.length)return;
-    if(confirm("Delete all logged expenses? This can't be undone.")){list=[];save();render();}});
+    if(confirm("Delete all logged expenses? This can't be undone.")){list=[];settled={};save();render();}});
   $("ex-copy").addEventListener("click",copySummary);
 
   const php=e=>e.cur==="PHP"?e.orig:e.orig*rate;
   const fmt=n=>"₱"+Math.round(n).toLocaleString();
+  const sig=x=>x.from+"-"+x.to+"-"+x.amt;
   function balances(){
     const b=[0,0,0];
     list.forEach(e=>{
@@ -916,29 +943,41 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
   function render(){
     const total=list.reduce((s,e)=>s+php(e),0);
     $("ex-total").textContent=fmt(total);
+    const paidTot=list.filter(e=>e.paid).reduce((s,e)=>s+php(e),0);
+    $("ex-paidsum").innerHTML=!list.length?"":
+      `<div class="paid-chip paid">✅ Paid ${fmt(paidTot)}</div><div class="paid-chip unpaid">⏳ Unpaid ${fmt(total-paidTot)}</div>`;
     const b=balances();
     $("ex-balances").innerHTML=PEOPLE.map((n,i)=>{
       const v=Math.round(b[i]), cls=v>0?"pos":v<0?"neg":"zero";
       const label=v>0?`gets back ${fmt(v)}`:v<0?`owes ${fmt(-v)}`:"all square";
       return `<div class="bal"><span class="who">${n}</span><span class="val ${cls}">${label}</span></div>`;}).join("");
     const s=settle(b);
+    const allDone=s.length&&s.every(x=>settled[sig(x)]);
     $("ex-settle").innerHTML=!list.length?"":
-      (s.length?s.map(x=>`<div class="settle-row">💸 <b>${PEOPLE[x.from]}</b> pays <b>${PEOPLE[x.to]}</b> <b>${fmt(x.amt)}</b></div>`).join("")
+      (s.length?(allDone?`<div class="settle-ok">🎉 All settled up — everyone's paid back!</div>`:"")+
+        s.map(x=>{const done=!!settled[sig(x)];
+          return `<div class="settle-row ${done?'done':''}" data-sig="${sig(x)}"><span class="s-body">💸 <b>${PEOPLE[x.from]}</b> pays <b>${PEOPLE[x.to]}</b> <b>${fmt(x.amt)}</b></span><span class="s-tag">${done?'✓ paid back':'tap when paid'}</span></div>`;}).join("")
                :`<div class="settle-ok">🎉 All square — nobody owes anyone!</div>`);
+    $("ex-settle").querySelectorAll(".settle-row").forEach(row=>row.addEventListener("click",()=>{
+      const k=row.dataset.sig;settled[k]=!settled[k];save();render();}));
     $("ex-list").innerHTML=!list.length?`<div class="ex-empty">No expenses yet. Add your first one above! 🐼</div>`:
       list.map(e=>{
         const inNames=e.split.map((x,i)=>x?PEOPLE[i]:null).filter(Boolean);
         const splitTxt=inNames.length===PEOPLE.length?"split 3 ways":"split: "+inNames.join(", ");
         const orig=e.cur==="CNY"?`¥${e.orig}`:`₱${e.orig}`;
-        return `<div class="exi"><div class="body"><div class="d">${e.desc}</div><div class="m">${PEOPLE[e.payer]} paid · ${orig} · ${splitTxt}</div></div><div class="amt">${fmt(php(e))}</div><button class="del" data-id="${e.id}" aria-label="Delete">✕</button></div>`;}).join("");
+        const pc=e.paid?"paid":"unpaid", pt=e.paid?"✅ Paid":"⏳ Unpaid";
+        return `<div class="exi"><div class="body"><div class="d">${e.desc}</div><div class="m">By ${PEOPLE[e.payer]} · ${orig} · ${splitTxt}</div><button class="paid-pill ${pc}" data-id="${e.id}">${pt}</button></div><div class="amt">${fmt(php(e))}</div><button class="del" data-id="${e.id}" aria-label="Delete">✕</button></div>`;}).join("");
+    $("ex-list").querySelectorAll(".paid-pill").forEach(btn=>btn.addEventListener("click",()=>{
+      const e=list.find(x=>x.id==btn.dataset.id);if(e){e.paid=!e.paid;save();render();}}));
     $("ex-list").querySelectorAll(".del").forEach(btn=>btn.addEventListener("click",()=>{
       list=list.filter(e=>e.id!=btn.dataset.id);save();render();}));
   }
   function copySummary(){
     const total=list.reduce((s,e)=>s+php(e),0), b=balances(), s=settle(b);
-    let txt=`🐼 Asian Pandas — Expense split\nTotal logged: ${fmt(total)} (${list.length} item${list.length===1?"":"s"})\n\n`;
+    const paidTot=list.filter(e=>e.paid).reduce((s,e)=>s+php(e),0);
+    let txt=`🐼 Asian Pandas — Expense split\nTotal logged: ${fmt(total)} (${list.length} item${list.length===1?"":"s"})\n✅ Paid: ${fmt(paidTot)} · ⏳ Unpaid: ${fmt(total-paidTot)}\n\n`;
     PEOPLE.forEach((n,i)=>{const v=Math.round(b[i]);txt+=`${n}: ${v>0?"gets back "+fmt(v):v<0?"owes "+fmt(-v):"all square"}\n`;});
-    txt+=`\nSettle up:\n`+(s.length?s.map(x=>`• ${PEOPLE[x.from]} pays ${PEOPLE[x.to]} ${fmt(x.amt)}`).join("\n"):"• All square! 🎉");
+    txt+=`\nSettle up:\n`+(s.length?s.map(x=>`• ${PEOPLE[x.from]} pays ${PEOPLE[x.to]} ${fmt(x.amt)}${settled[sig(x)]?" ✓ paid":""}`).join("\n"):"• All square! 🎉");
     txt+=`\n\n(as of ${new Date().toLocaleDateString()})`;
     if(navigator.share){navigator.share({text:txt}).catch(()=>{});}
     else{navigator.clipboard?.writeText(txt).then(()=>{const btn=$("ex-copy"),o=btn.textContent;btn.textContent="✓ Copied!";setTimeout(()=>btn.textContent=o,1600);}).catch(()=>alert(txt));}
