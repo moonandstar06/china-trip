@@ -1001,11 +1001,13 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
     $("ex-paidsum").innerHTML=!list.length?"":
       `<div class="paid-chip paid">✅ Paid ${fmt(paidTot)}</div><div class="paid-chip unpaid">⏳ Unpaid ${fmt(total-paidTot)}</div>`;
     const b=balances();
+    const s=settle(b);
+    const eff=b.slice();
+    s.forEach(x=>{ if(settled[sig(x)]){ eff[x.from]+=x.amt; eff[x.to]-=x.amt; } });
     $("ex-balances").innerHTML=PEOPLE.map((n,i)=>{
-      const v=Math.round(b[i]), cls=v>0?"pos":v<0?"neg":"zero";
+      let vv=eff[i]; if(Math.abs(vv)<1) vv=0; const v=Math.round(vv), cls=v>0?"pos":v<0?"neg":"zero";
       const label=v>0?`gets back ${fmt(v)}`:v<0?`owes ${fmt(-v)}`:"all square";
       return `<div class="bal"><span class="who">${n}</span><span class="val ${cls}">${label}</span></div>`;}).join("");
-    const s=settle(b);
     const allDone=s.length&&s.every(x=>settled[sig(x)]);
     $("ex-settle").innerHTML=!list.length?"":
       (s.length?(allDone?`<div class="settle-ok">🎉 All settled up — everyone's paid back!</div>`:"")+
