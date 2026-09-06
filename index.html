@@ -997,20 +997,20 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
   function render(){
     const total=list.reduce((s,e)=>s+php(e),0);
     $("ex-total").textContent=fmt(total);
-    const paidTot=list.filter(e=>e.paid).reduce((s,e)=>s+php(e),0);
-    $("ex-paidsum").innerHTML=!list.length?"":
-      `<div class="paid-chip paid">✅ Paid ${fmt(paidTot)}</div><div class="paid-chip unpaid">⏳ Unpaid ${fmt(total-paidTot)}</div>`;
     const b=balances();
     const s=settle(b);
+    const allSettled=list.length>0 && (s.length===0 || s.every(x=>settled[sig(x)]));
+    const paidTot=allSettled?total:list.filter(e=>e.paid).reduce((a,e)=>a+php(e),0);
+    $("ex-paidsum").innerHTML=!list.length?"":
+      `<div class="paid-chip paid">✅ Paid ${fmt(paidTot)}</div><div class="paid-chip unpaid">⏳ Unpaid ${fmt(total-paidTot)}</div>`;
     const eff=b.slice();
     s.forEach(x=>{ if(settled[sig(x)]){ eff[x.from]+=x.amt; eff[x.to]-=x.amt; } });
     $("ex-balances").innerHTML=PEOPLE.map((n,i)=>{
       let vv=eff[i]; if(Math.abs(vv)<1) vv=0; const v=Math.round(vv), cls=v>0?"pos":v<0?"neg":"zero";
       const label=v>0?`gets back ${fmt(v)}`:v<0?`owes ${fmt(-v)}`:"all square";
       return `<div class="bal"><span class="who">${n}</span><span class="val ${cls}">${label}</span></div>`;}).join("");
-    const allDone=s.length&&s.every(x=>settled[sig(x)]);
     $("ex-settle").innerHTML=!list.length?"":
-      (s.length?(allDone?`<div class="settle-ok">🎉 All settled up — everyone's paid back!</div>`:"")+
+      (s.length?(allSettled?`<div class="settle-ok">🎉 All settled up — everyone's paid back!</div>`:"")+
         s.map(x=>{const done=!!settled[sig(x)];
           return `<div class="settle-row ${done?'done':''}" data-sig="${sig(x)}"><span class="s-body">💸 <b>${PEOPLE[x.from]}</b> pays <b>${PEOPLE[x.to]}</b> <b>${fmt(x.amt)}</b></span><span class="s-tag">${done?'✓ paid back':'tap when paid'}</span></div>`;}).join("")
                :`<div class="settle-ok">🎉 All square — nobody owes anyone!</div>`);
@@ -1021,7 +1021,8 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
         const inNames=e.split.map((x,i)=>x?PEOPLE[i]:null).filter(Boolean);
         const splitTxt=inNames.length===PEOPLE.length?"split 3 ways":"split: "+inNames.join(", ");
         const orig=e.cur==="CNY"?`¥${e.orig}`:`₱${e.orig}`;
-        const pc=e.paid?"paid":"unpaid", pt=e.paid?"✅ Paid":"⏳ Unpaid";
+        const isPaid=allSettled||e.paid;
+        const pc=isPaid?"paid":"unpaid", pt=isPaid?"✅ Paid":"⏳ Unpaid";
         return `<div class="exi"><div class="body"><div class="d">${e.desc}</div><div class="m">By ${PEOPLE[e.payer]} · ${orig} · ${splitTxt}</div><button class="paid-pill ${pc}" data-id="${e.id}">${pt}</button></div><div class="amt">${fmt(php(e))}</div><button class="del" data-id="${e.id}" aria-label="Delete">✕</button></div>`;}).join("");
     $("ex-list").querySelectorAll(".paid-pill").forEach(btn=>btn.addEventListener("click",()=>{
       const e=list.find(x=>x.id==btn.dataset.id);if(e){e.paid=!e.paid;save();render();if(CLOUD.on)CLOUD.op({op:"setPaid",id:e.id,val:e.paid?1:0});}}));
@@ -1030,10 +1031,12 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
   }
   function copySummary(){
     const total=list.reduce((s,e)=>s+php(e),0), b=balances(), s=settle(b);
+    const eff=b.slice(); s.forEach(x=>{ if(settled[sig(x)]){ eff[x.from]+=x.amt; eff[x.to]-=x.amt; } });
     const paidTot=list.filter(e=>e.paid).reduce((s,e)=>s+php(e),0);
     let txt=`🐼 Asian Pandas — Expense split\nTotal logged: ${fmt(total)} (${list.length} item${list.length===1?"":"s"})\n✅ Paid: ${fmt(paidTot)} · ⏳ Unpaid: ${fmt(total-paidTot)}\n\n`;
-    PEOPLE.forEach((n,i)=>{const v=Math.round(b[i]);txt+=`${n}: ${v>0?"gets back "+fmt(v):v<0?"owes "+fmt(-v):"all square"}\n`;});
-    txt+=`\nSettle up:\n`+(s.length?s.map(x=>`• ${PEOPLE[x.from]} pays ${PEOPLE[x.to]} ${fmt(x.amt)}${settled[sig(x)]?" ✓ paid":""}`).join("\n"):"• All square! 🎉");
+    PEOPLE.forEach((n,i)=>{let vv=eff[i];if(Math.abs(vv)<1)vv=0;const v=Math.round(vv);txt+=`${n}: ${v>0?"gets back "+fmt(v):v<0?"owes "+fmt(-v):"all square"}\n`;});
+    const pend=s.filter(x=>!settled[sig(x)]);
+    txt+=`\nSettle up:\n`+(pend.length?pend.map(x=>`• ${PEOPLE[x.from]} pays ${PEOPLE[x.to]} ${fmt(x.amt)}`).join("\n"):"• All settled! 🎉");
     txt+=`\n\n(as of ${new Date().toLocaleDateString()})`;
     if(navigator.share){navigator.share({text:txt}).catch(()=>{});}
     else{navigator.clipboard?.writeText(txt).then(()=>{const btn=$("ex-copy"),o=btn.textContent;btn.textContent="✓ Copied!";setTimeout(()=>btn.textContent=o,1600);}).catch(()=>alert(txt));}
