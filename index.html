@@ -270,6 +270,8 @@ details ol,details ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-heig
 .exi .amt{font-family:"Baloo 2";font-weight:800;font-size:15px;white-space:nowrap}
 .exi .del{border:0;background:none;color:var(--red);font-size:18px;cursor:pointer;padding:0 2px}
 .ex-empty{text-align:center;color:var(--ink-soft);font-size:13px;padding:14px 0}
+.sync-badge{display:inline-block;font-size:11px;font-weight:800;color:var(--jade);background:#eafaf2;border:1px solid #cfe9dc;border-radius:999px;padding:1px 8px;vertical-align:middle}
+.sync-badge:empty{display:none}
 .ex-paidsum{display:flex;gap:8px;margin-top:10px}
 .paid-chip{flex:1;text-align:center;font-family:"Baloo 2";font-weight:800;font-size:13px;border-radius:10px;padding:7px 0;border:1px solid}
 .paid-chip.paid{background:#d8efe3;color:#1f5e42;border-color:#a9dcc4}
@@ -450,7 +452,7 @@ details ol,details ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-heig
   <section class="view" id="view-money">
     <div class="wrap">
       <h2 class="section-title">Money 💰</h2>
-      <p class="section-sub">Log what you spend — we'll split it and show who owes whom.</p>
+      <p class="section-sub">Log what you spend — we'll split it and show who owes whom. <span id="sync-badge" class="sync-badge"></span></p>
 
       <!-- settlement summary -->
       <div class="card accent">
@@ -568,10 +570,57 @@ details ol,details ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-heig
 
 <script>
 /* =====================================================================
-   ASIAN PANDAS · edit these two lines, then re-publish to share updates
+   ASIAN PANDAS — CONFIG  (edit these, then re-publish)
    ===================================================================== */
-const PHOTO_ALBUM_URL = "";   // ← paste your Google Photos shared-album link here
 const PANDA_NAMES = ["Tina","Wheng","Chari"];
+const PHOTO_ALBUM_URL = "";   // optional: hard-code a Google Photos album link here
+// Paste your Google Apps Script Web App /exec URL here to sync ALL phones live.
+// Leave "" and the app just saves on each phone (no sharing).
+const SYNC_URL = "";
+/* ===================================================================== */
+
+/* ---------- live sync: Google Sheet via Apps Script (JSONP = no CORS) ---------- */
+const CLOUD=(function(){
+  const on=/^https?:\/\//.test(SYNC_URL);
+  const OKEY="asianpandas.v1.outbox";
+  const listeners=[]; let state=null, outbox=[], busy=0;
+  try{outbox=JSON.parse(localStorage.getItem(OKEY))||[];}catch(e){outbox=[];}
+  const saveOut=()=>{try{localStorage.setItem(OKEY,JSON.stringify(outbox));}catch(e){}};
+  function jsonp(params){
+    return new Promise((resolve,reject)=>{
+      const cb="_cb"+Date.now()+Math.floor(Math.random()*1e4);
+      const q=Object.keys(params).map(k=>encodeURIComponent(k)+"="+encodeURIComponent(params[k])).join("&");
+      const sc=document.createElement("script"); let done=false;
+      window[cb]=d=>{done=true;resolve(d);clean();};
+      function clean(){try{delete window[cb];}catch(e){window[cb]=undefined;}sc.remove();}
+      sc.onerror=()=>{if(!done){clean();reject(new Error("net"));}};
+      sc.src=SYNC_URL+(SYNC_URL.indexOf("?")<0?"?":"&")+"callback="+cb+"&"+q;
+      document.body.appendChild(sc);
+      setTimeout(()=>{if(!done){clean();reject(new Error("timeout"));}},15000);
+    });
+  }
+  function emit(){listeners.forEach(fn=>{try{fn(state);}catch(e){}});}
+  function badge(){const el=document.getElementById("sync-badge");if(el)el.textContent=on?(busy>0||outbox.length?"⟳ syncing…":"✓ synced live"):"";}
+  async function flush(){
+    if(!on||!outbox.length)return;
+    busy++;badge();
+    while(outbox.length){
+      try{const r=await jsonp(outbox[0]); if(r&&r.state)state=r.state; outbox.shift(); saveOut();}
+      catch(e){break;}
+    }
+    busy=Math.max(0,busy-1);emit();badge();
+  }
+  async function op(params){ if(!on)return; outbox.push(params); saveOut(); await flush(); }
+  async function refresh(){
+    if(!on)return; await flush(); if(outbox.length)return;
+    busy++;badge();
+    try{const r=await jsonp({op:"get"}); if(r&&r.state){state=r.state;emit();}}catch(e){}
+    busy=Math.max(0,busy-1);badge();
+  }
+  function onState(fn){listeners.push(fn); if(state)fn(state);}
+  if(on){ refresh(); setInterval(refresh,12000); document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh();}); }
+  return {on,op,onState,refresh,get state(){return state;}};
+})();
 /* ===================================================================== */
 
 const TZ = "Asia/Shanghai"; // Beijing & Manila are both UTC+8
@@ -816,7 +865,7 @@ function loadState(){try{return JSON.parse(localStorage.getItem(LSKEY))||{}}catc
 function saveState(o){try{localStorage.setItem(LSKEY,JSON.stringify(o))}catch(e){}}
 let state=loadState();
 const TICK_SVG='<svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-(function renderChecklist(){
+function renderChecklist(){
   const host=document.getElementById("checklist");
   host.innerHTML=CHECK.map(grp=>{
     const rows=grp.items.map(([id,t,s])=>{
@@ -829,10 +878,13 @@ const TICK_SVG='<svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" st
     c.addEventListener("click",()=>{
       const id=c.dataset.id; state[id]=!state[id];
       c.classList.toggle("done",state[id]); saveState(state); updateRing();
+      if(CLOUD.on) CLOUD.op({op:"setCheck",key:id,val:state[id]?1:0});
     });
   });
   updateRing();
-})();
+}
+renderChecklist();
+if(CLOUD.on){ CLOUD.onState(st=>{ if(st&&st.checklist){ state=st.checklist; saveState(state); renderChecklist(); } }); }
 function updateRing(){
   const all=CHECK.reduce((n,g)=>n+g.items.length,0);
   const done=Object.values(state).filter(Boolean).length;
@@ -901,21 +953,23 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
     cur=b.dataset.c;$("ex-cur").querySelectorAll(".cur").forEach(x=>x.classList.toggle("active",x===b));}));
   $("ex-paidset").querySelectorAll(".pt").forEach(b=>b.addEventListener("click",()=>{
     paidNew=b.dataset.p==="1";$("ex-paidset").querySelectorAll(".pt").forEach(x=>x.classList.toggle("on",x===b));}));
-  $("ex-rate").addEventListener("change",()=>{const v=parseFloat($("ex-rate").value);if(v>0){rate=v;save();render();}});
+  $("ex-rate").addEventListener("change",()=>{const v=parseFloat($("ex-rate").value);if(v>0){rate=v;save();render();if(CLOUD.on)CLOUD.op({op:"setRate",rate:v});}});
 
   $("ex-add").addEventListener("click",()=>{
     const desc=$("ex-desc").value.trim(), amt=parseFloat($("ex-amt").value);
     if(!desc){alert("Add a short description");return;}
     if(!(amt>0)){alert("Enter an amount");return;}
     if(!split.some(Boolean)){alert("Pick at least one person to split between");return;}
-    list.unshift({id:Date.now(),desc,orig:amt,cur,payer,split:[...split],paid:paidNew});
+    const ex={id:Date.now(),desc,orig:amt,cur,payer,split:[...split],paid:paidNew};
+    list.unshift(ex);
     save();$("ex-desc").value="";$("ex-amt").value="";
     paidNew=false;$("ex-paidset").querySelectorAll(".pt").forEach((x,i)=>x.classList.toggle("on",i===0));
     render();
+    if(CLOUD.on)CLOUD.op({op:"addExpense",expense:JSON.stringify(ex)});
   });
   $("ex-clear").addEventListener("click",()=>{
     if(!list.length)return;
-    if(confirm("Delete all logged expenses? This can't be undone.")){list=[];settled={};save();render();}});
+    if(confirm("Delete all logged expenses? This can't be undone.")){list=[];settled={};save();render();if(CLOUD.on)CLOUD.op({op:"clearExpenses"});}});
   $("ex-copy").addEventListener("click",copySummary);
 
   const php=e=>e.cur==="PHP"?e.orig:e.orig*rate;
@@ -959,7 +1013,7 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
           return `<div class="settle-row ${done?'done':''}" data-sig="${sig(x)}"><span class="s-body">💸 <b>${PEOPLE[x.from]}</b> pays <b>${PEOPLE[x.to]}</b> <b>${fmt(x.amt)}</b></span><span class="s-tag">${done?'✓ paid back':'tap when paid'}</span></div>`;}).join("")
                :`<div class="settle-ok">🎉 All square — nobody owes anyone!</div>`);
     $("ex-settle").querySelectorAll(".settle-row").forEach(row=>row.addEventListener("click",()=>{
-      const k=row.dataset.sig;settled[k]=!settled[k];save();render();}));
+      const k=row.dataset.sig;settled[k]=!settled[k];save();render();if(CLOUD.on)CLOUD.op({op:"setSettled",key:k,val:settled[k]?1:0});}));
     $("ex-list").innerHTML=!list.length?`<div class="ex-empty">No expenses yet. Add your first one above! 🐼</div>`:
       list.map(e=>{
         const inNames=e.split.map((x,i)=>x?PEOPLE[i]:null).filter(Boolean);
@@ -968,9 +1022,9 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
         const pc=e.paid?"paid":"unpaid", pt=e.paid?"✅ Paid":"⏳ Unpaid";
         return `<div class="exi"><div class="body"><div class="d">${e.desc}</div><div class="m">By ${PEOPLE[e.payer]} · ${orig} · ${splitTxt}</div><button class="paid-pill ${pc}" data-id="${e.id}">${pt}</button></div><div class="amt">${fmt(php(e))}</div><button class="del" data-id="${e.id}" aria-label="Delete">✕</button></div>`;}).join("");
     $("ex-list").querySelectorAll(".paid-pill").forEach(btn=>btn.addEventListener("click",()=>{
-      const e=list.find(x=>x.id==btn.dataset.id);if(e){e.paid=!e.paid;save();render();}}));
+      const e=list.find(x=>x.id==btn.dataset.id);if(e){e.paid=!e.paid;save();render();if(CLOUD.on)CLOUD.op({op:"setPaid",id:e.id,val:e.paid?1:0});}}));
     $("ex-list").querySelectorAll(".del").forEach(btn=>btn.addEventListener("click",()=>{
-      list=list.filter(e=>e.id!=btn.dataset.id);save();render();}));
+      const id=btn.dataset.id;list=list.filter(e=>e.id!=id);save();render();if(CLOUD.on)CLOUD.op({op:"deleteExpense",id:id});}));
   }
   function copySummary(){
     const total=list.reduce((s,e)=>s+php(e),0), b=balances(), s=settle(b);
@@ -982,25 +1036,31 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
     if(navigator.share){navigator.share({text:txt}).catch(()=>{});}
     else{navigator.clipboard?.writeText(txt).then(()=>{const btn=$("ex-copy"),o=btn.textContent;btn.textContent="✓ Copied!";setTimeout(()=>btn.textContent=o,1600);}).catch(()=>alert(txt));}
   }
+  if(CLOUD.on){ CLOUD.onState(st=>{ if(!st)return; list=Array.isArray(st.expenses)?st.expenses:[]; settled=st.settled||{}; if(st.rate>0){rate=st.rate;$("ex-rate").value=rate;} save(); render(); }); }
   render();
 })();
 
 /* ---------- photos ---------- */
 (function photos(){
-  let url=PHOTO_ALBUM_URL;
-  try{ if(!url) url=localStorage.getItem("asianpandas.v1.album")||""; }catch(e){}
   const live=document.getElementById("album-live"), setup=document.getElementById("album-setup");
+  function currentUrl(){
+    if(PHOTO_ALBUM_URL) return PHOTO_ALBUM_URL;
+    if(CLOUD.on && CLOUD.state && CLOUD.state.album) return CLOUD.state.album;
+    try{ return localStorage.getItem("asianpandas.v1.album")||""; }catch(e){ return ""; }
+  }
   function show(u){
     if(u){ live.style.display="block"; setup.style.display=(PHOTO_ALBUM_URL?"none":"block");
       document.getElementById("album-open").href=u; document.getElementById("album-add").href=u; }
   }
-  show(url);
+  show(currentUrl());
   document.getElementById("album-save").addEventListener("click",()=>{
     const v=document.getElementById("album-input").value.trim();
     if(!/^https?:\/\//.test(v)){ alert("Paste a full link starting with https://"); return; }
     try{ localStorage.setItem("asianpandas.v1.album",v); }catch(e){}
+    if(CLOUD.on) CLOUD.op({op:"setAlbum",album:v});
     show(v); document.getElementById("album-input").value="";
   });
+  if(CLOUD.on){ CLOUD.onState(()=>show(currentUrl())); }
 })();
 
 /* ---------- weather (Open-Meteo, keyless) ---------- */
