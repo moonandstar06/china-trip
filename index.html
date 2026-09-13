@@ -399,6 +399,14 @@ details ol,details ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-heig
         <div class="flight"><div class="leg"><div class="fr">Xi'an → Guangzhou → Manila</div><div class="sub">Fri Sep 25 · 16:00 dep → 23:15 arr</div></div><span class="code">CZ3212/3077</span></div>
         <p class="note">Total airfare on the booking: <b>₱63,777</b>. Connections in Guangzhou both ways — keep your boarding passes handy.</p>
       </div>
+
+      <div class="card">
+        <span class="pill jade">STAYS · CONFIRMED ✓</span>
+        <h3 style="margin:8px 0 8px;color:var(--red-deep)">🏨 Where we're staying</h3>
+        <div class="flight"><div class="leg"><div class="fr">East Sacred Hotel — Beijing</div><div class="sub">Sep 20–23 (3 nts) · near Tiananmen & the Forbidden City · US$415.10</div></div><span class="code">🛏️</span></div>
+        <div class="flight"><div class="leg"><div class="fr">Holiday Inn Express Xi'an Bell Tower</div><div class="sub">Sep 23–25 (2 nts) · 5-min walk to Muslim Quarter & City Wall · US$126.22</div></div><span class="code">🛏️</span></div>
+        <p class="note">Both <b>confirmed</b>. Beijing stay is walkable to the Forbidden City; Xi'an stay is right by the Bell Tower with metro Lines 2 &amp; 6.</p>
+      </div>
     </div>
   </section>
 
@@ -676,7 +684,7 @@ const DAYS = [
    {t:"01:00",k:"wake",x:"Very early wake-up for the airport 😴 — nap on the flight!"},
    {t:"03:45",k:"travel",x:"Manila → Guangzhou (CZ5052), then Guangzhou → Beijing (CZ3099)"},
    {t:"12:15",k:"travel",x:"Land at Beijing Daxing (PKX) — immigration & bags (~1 hr)"},
-   {t:"13:30",k:"travel",x:"Transfer to Dongcheng hotel (~1 hr): Daxing Express + subway, or DiDi/taxi"},
+   {t:"13:30",k:"travel",x:"Transfer to East Sacred Hotel near Tiananmen (~1 hr): Daxing Express + subway, or DiDi/taxi"},
    {t:"14:30",k:"see",x:"Check in, freshen up, short rest"},
    {t:"16:00",k:"see",x:"Easy stroll on Wangfujing pedestrian street to shake off the flight"},
    {t:"18:30",k:"meal",x:"Peking duck welcome dinner (book ahead — e.g. Siji Minfu) 🦆"},
@@ -719,7 +727,7 @@ const DAYS = [
    {t:"11:15",k:"meal",x:"Early lunch nearby"},
    {t:"12:30",k:"travel",x:"Collect bags, head to Beijing West Station (1.5–2 hr buffer)"},
    {t:"15:00",k:"travel",x:"G-train to Xi'an (~4.5 hrs, 2nd class) 🚄"},
-   {t:"19:30",k:"travel",x:"Arrive Xi'an North → transfer to Bell Tower hotel (~40 min)"},
+   {t:"19:30",k:"travel",x:"Arrive Xi'an North → transfer to Holiday Inn Express Bell Tower (~40 min)"},
    {t:"20:15",k:"see",x:"Check in"},
    {t:"20:45",k:"meal",x:"Muslim Quarter street food dinner 🍜"},
    {t:"22:30",k:"sleep",x:"Sleep 🌙"}],
@@ -854,8 +862,8 @@ tick(); setInterval(tick,1000);
 const CHECK = [
  {g:"📌 Book ahead",items:[
    ["visa","China tourist (L) visa","CVASC · Eton Centris, QC · ~₱3,948pp"],
-   ["hotel-bj","Beijing hotel — 3 nights (Sep 20–23)","Dongcheng, near Wangfujing"],
-   ["hotel-xa","Xi'an hotel — 2 nights (Sep 23–25)","Near the Bell Tower"],
+   ["hotel-bj","Beijing hotel — 3 nights (Sep 20–23)","East Sacred Hotel, near Tiananmen · ✓ Confirmed"],
+   ["hotel-xa","Xi'an hotel — 2 nights (Sep 23–25)","Holiday Inn Express Bell Tower · ✓ Confirmed"],
    ["train","Beijing → Xi'an bullet train","12306 / Trip.com · opens ~15 days before"],
    ["tcw","Terracotta Warriors tickets","Online · 7-day booking window"],
    ["car-wall","Great Wall private car (Mutianyu)",""],
@@ -955,8 +963,8 @@ document.getElementById("phrases").innerHTML=PHRASES.map(p=>
 const BUDGET=[
  ["Visa (single-entry L)","₱3,948","fixed · CVASC Manila"],
  ["Flights (as booked)","₱63,777","Manila↔Beijing/Xi'an, open-jaw"],
- ["Hotel — Beijing (3 nts)","₱3,150–4,650","3-star, triple-share"],
- ["Hotel — Xi'an (2 nts)","₱1,250–1,850","3-star, triple-share"],
+ ["Hotel — Beijing (3 nts)","≈₱7,900","East Sacred · US$415 ÷3, booked ✓"],
+ ["Hotel — Xi'an (2 nts)","≈₱2,400","Holiday Inn Express · US$126 ÷3, booked ✓"],
  ["Bullet train Beijing→Xi'an","₱4,450–5,100","G-train, 2nd class"],
  ["Attraction entrances","≈₱5,550","Wall, Forbidden City, Warriors…"],
  ["Day-trip private cars","₱3,450–4,300","Wall + Warriors, shared 3 ways"],
