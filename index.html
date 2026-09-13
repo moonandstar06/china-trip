@@ -145,12 +145,20 @@ h1,h2,h3,.disp{font-family:"Baloo 2",system-ui,sans-serif;font-weight:800;line-h
 .today-pill{position:absolute;top:10px;right:12px;background:var(--jade);color:#fff;font-family:"Baloo 2";
   font-weight:800;font-size:10px;letter-spacing:.5px;padding:3px 9px;border-radius:999px;z-index:2}
 .day-body{max-height:0;overflow:hidden;transition:max-height .32s ease}
-.day.open .day-body{max-height:900px}
+.day.open .day-body{max-height:2400px}
 .day-body .inner{padding:4px 16px 16px}
 .walkline{font-size:12px;color:var(--jade);font-weight:800;margin:0 0 8px}
 .day-clock{display:inline-flex;align-items:center;gap:8px;font-family:"Baloo 2";font-weight:800;font-size:12px;
   background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 13px;margin:0 0 10px;color:var(--ink)}
 .day-clock .dot{color:var(--line)}
+.notes-box{margin-top:12px;background:#fff;border:1.5px dashed var(--gold);border-radius:12px;padding:11px 12px}
+.notes-label{font-family:"Baloo 2";font-weight:800;font-size:13px;color:var(--red-deep);margin-bottom:7px}
+.note-area{width:100%;min-height:76px;border:1.5px solid var(--line);border-radius:10px;padding:9px;font-family:inherit;font-size:14px;line-height:1.45;resize:vertical;background:var(--cream-2)}
+.note-area:focus{outline:none;border-color:var(--jade)}
+.notes-actions{display:flex;align-items:center;gap:10px;margin-top:8px}
+.note-save{border:0;background:var(--jade);color:#fff;font-family:"Baloo 2";font-weight:800;font-size:13px;border-radius:10px;padding:8px 16px;cursor:pointer}
+.note-save:active{transform:translateY(1px)}
+.note-status{font-size:12px;font-weight:800;color:var(--jade)}
 .tl{position:relative;margin:0;padding:0}
 .tl::before{content:"";position:absolute;left:62px;top:16px;bottom:16px;width:2px;background:var(--line)}
 .tl-row{display:grid;grid-template-columns:44px 22px 1fr;gap:8px;align-items:start;padding:7px 0}
@@ -743,6 +751,14 @@ const DAYS = [
 ];
 const KIND={wake:"☀️",meal:"🍽️",travel:"🚗",see:"📍",free:"🛍️",sleep:"🌙"};
 
+const NKEY="asianpandas.v1.notes";
+let notes={};
+try{notes=JSON.parse(localStorage.getItem(NKEY))||{};}catch(e){notes={};}
+function saveNotes(){try{localStorage.setItem(NKEY,JSON.stringify(notes));}catch(e){}}
+function pushNote(date,val){
+  notes[date]=val; saveNotes();
+  if(CLOUD.on) CLOUD.op({op:"setNote",key:date,text:val});
+}
 (function renderDays(){
   const today = ymdInTZ(new Date());
   const host = document.getElementById("days");
@@ -762,12 +778,35 @@ const KIND={wake:"☀️",meal:"🍽️",travel:"🚗",see:"📍",free:"🛍️"
         <p class="walkline">👟 ${d.walk}</p>
         <div class="tl">${stepsHtml}</div>
         <div class="tip"><b>Panda tip:</b> ${d.tip}</div>
+        <div class="notes-box">
+          <div class="notes-label">📝 Our picks — restaurants, shops &amp; spots</div>
+          <textarea class="note-area" data-date="${d.date}" placeholder="Add restaurants, stores, must-buys, addresses… (shared with everyone)"></textarea>
+          <div class="notes-actions"><button class="note-save" data-date="${d.date}">Save note</button><span class="note-status" data-date="${d.date}"></span></div>
+        </div>
       </div></div>
     </div>`;
   }).join("");
   host.querySelectorAll(".day-head").forEach(h=>{
     h.addEventListener("click",()=>h.parentElement.classList.toggle("open"));
   });
+  // fill notes from local cache
+  host.querySelectorAll(".note-area").forEach(ta=>{ ta.value=notes[ta.dataset.date]||""; });
+  // save button
+  host.querySelectorAll(".note-save").forEach(btn=>btn.addEventListener("click",()=>{
+    const date=btn.dataset.date;
+    const ta=host.querySelector('.note-area[data-date="'+date+'"]');
+    pushNote(date, ta.value);
+    const st=host.querySelector('.note-status[data-date="'+date+'"]');
+    if(st){ st.textContent="saved ✓"; setTimeout(()=>st.textContent="",1600); }
+  }));
+  // auto-save on blur
+  host.querySelectorAll(".note-area").forEach(ta=>ta.addEventListener("blur",()=>{
+    const date=ta.dataset.date; if((notes[date]||"")===ta.value) return; pushNote(date, ta.value);
+  }));
+  // live updates from other phones (don't clobber the box you're typing in)
+  if(CLOUD.on){ CLOUD.onState(st=>{ if(st&&st.notes){ notes=st.notes; saveNotes();
+    host.querySelectorAll(".note-area").forEach(ta=>{ if(document.activeElement!==ta){ ta.value=notes[ta.dataset.date]||""; } });
+  }}); }
 })();
 
 /* ---------- countdown + trip state ---------- */
