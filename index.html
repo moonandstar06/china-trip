@@ -1047,7 +1047,7 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
     const b=balances();
     const s=settle(b);
     const allSettled=list.length>0 && (s.length===0 || s.every(x=>settled[sig(x)]));
-    const paidTot=allSettled?total:list.filter(e=>e.paid).reduce((a,e)=>a+php(e),0);
+    const paidTot=list.filter(e=>e.paid).reduce((a,e)=>a+php(e),0);
     $("ex-paidsum").innerHTML=!list.length?"":
       `<div class="paid-chip paid">✅ Paid ${fmt(paidTot)}</div><div class="paid-chip unpaid">⏳ Unpaid ${fmt(total-paidTot)}</div>`;
     const eff=b.slice();
@@ -1068,7 +1068,7 @@ document.getElementById("budget-total").textContent="≈ ₱96k–102k";
         const inNames=e.split.map((x,i)=>x?PEOPLE[i]:null).filter(Boolean);
         const splitTxt=inNames.length===PEOPLE.length?"split 3 ways":"split: "+inNames.join(", ");
         const orig=e.cur==="CNY"?`¥${e.orig}`:`₱${e.orig}`;
-        const isPaid=allSettled||e.paid;
+        const isPaid=e.paid;
         const pc=isPaid?"paid":"unpaid", pt=isPaid?"✅ Paid":"⏳ Unpaid";
         return `<div class="exi"><div class="body"><div class="d">${e.desc}</div><div class="m">By ${PEOPLE[e.payer]} · ${orig} · ${splitTxt}</div><button class="paid-pill ${pc}" data-id="${e.id}">${pt}</button></div><div class="amt">${fmt(php(e))}</div><button class="del" data-id="${e.id}" aria-label="Delete">✕</button></div>`;}).join("");
     $("ex-list").querySelectorAll(".paid-pill").forEach(btn=>btn.addEventListener("click",()=>{
